@@ -79,6 +79,7 @@ func (ct *ContactRepo) indexChatRooms() {
 		contactModel := ct.ContactModelMap[cm.Name]
 		cm.NickName = contactModel.NickName
 		cm.Remark = contactModel.Remark
+		cm.HeadUrl = contactModel.SmallHeadUrl
 		chatRoomMap[cm.Name] = cm
 
 		if cm.Remark != "" {
@@ -222,8 +223,24 @@ func (ct *ContactRepo) indexContactWework(aliasMap map[string][]*model.ContactVo
 	}
 }
 
-func (ct *ContactRepo) GetContactByUsername(username string) *model.ContactVo {
+func (ct *ContactRepo) GetContactByUsername(context context.Context, username string) *model.ContactVo {
 	if vo, ok := ct.ContactMap[username]; ok {
+		return vo
+	} else {
+		return nil
+	}
+}
+
+func (ct *ContactRepo) GetContactModelByUsername(context context.Context, username string) *v4.ContactModel {
+	if vo, ok := ct.ContactModelMap[username]; ok {
+		return vo
+	} else {
+		return nil
+	}
+}
+
+func (ct *ContactRepo) GetChatRoomByUsername(context context.Context, username string) *model.ChatRoom {
+	if vo, ok := ct.ChatRoomMap[username]; ok {
 		return vo
 	} else {
 		return nil

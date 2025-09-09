@@ -2,9 +2,12 @@ package v4
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"github.com/labstack/gommon/log"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 	"wechat-secretary/backend/pkg/errorx"
@@ -24,7 +27,8 @@ const (
 
 var DBInitMaps = map[string]Db{
 	Contact: &ContactDb{},
-	// Message: &MessageDb{},
+	Session: &SessionDb{},
+	Media:   &MediaDb{},
 }
 
 var Groups = []*Group{
@@ -95,21 +99,6 @@ func New(path string) (*DataSource, error) {
 	if err := ds.fm.Start(); err != nil {
 		return nil, err
 	}
-
-	// if err := ds.initMessageDbs(); err != nil {
-	// 	log.Errorf("Failed to init message DB err:%s", err)
-	// 	return nil, errorx.MessageDBInitFailed()
-	// }
-	//
-	// ds.db.AddCallback(Message, func(event fsnotify.Event) error {
-	// 	if !event.Op.Has(fsnotify.Create) {
-	// 		return nil
-	// 	}
-	// 	if err := ds.initMessageDbs(); err != nil {
-	// 		log.Errorf("Failed to reinitialize message DB err:%s", err)
-	// 	}
-	// 	return nil
-	// })
 
 	return ds, nil
 }
@@ -377,62 +366,123 @@ func New(path string) (*DataSource, error) {
 // 企业联系人
 //
 //	联系人
-func (ds *DataSource) GetContacts(ctx context.Context, key string, limit, offset int) ([]*model.Contact, error) {
+// func (ds *DataSource) GetContacts(ctx context.Context, key string, limit, offset int) ([]*model.Contact, error) {
+// 	var query string
+// 	var args []interface{}
+//
+// 	if key != "" {
+// 		// 按照关键字查询
+// 		query = `SELECT username, local_type, alias, remark, nick_name, big_head_url, small_head_url, extra_buffer
+// 				FROM contact
+// 				WHERE username = ? OR alias = ? OR remark = ? OR nick_name = ?`
+// 		args = []interface{}{key, key, key, key}
+// 	} else {
+// 		// 查询所有联系人
+// 		query = `SELECT username, local_type, alias, remark, nick_name, big_head_url, small_head_url, extra_buffer FROM contact`
+// 	}
+//
+// 	// 添加排序、分页
+// 	query += ` ORDER BY username`
+// 	if limit > 0 {
+// 		query += fmt.Sprintf(" LIMIT %d", limit)
+// 		if offset > 0 {
+// 			query += fmt.Sprintf(" OFFSET %d", offset)
+// 		}
+// 	}
+// 	dbs := ds.dbMap[Contact].GetDb(time.Now(), time.Now())
+// 	db := dbs[0]
+//
+// 	rows, err := db.QueryContext(ctx, query, args...)
+// 	if err != nil {
+// 		log.Errorf("Failed to query contact db.sql:&s,err:%s", query, err)
+// 		return nil, errorx.QueryFailed()
+// 	}
+// 	defer rows.Close()
+//
+// 	contacts := []*model.Contact{}
+// 	for rows.Next() {
+// 		var contactV4 model.ContactV4
+// 		err := rows.Scan(
+// 			&contactV4.UserName,
+// 			&contactV4.LocalType,
+// 			&contactV4.Alias,
+// 			&contactV4.Remark,
+// 			&contactV4.NickName,
+// 			&contactV4.BigHeadUrl,
+// 			&contactV4.SmallHeadUrl,
+// 			&contactV4.ExtraBuffer,
+// 		)
+//
+// 		if err != nil {
+// 			return nil, errorx.QueryFailed()
+// 		}
+//
+// 		contacts = append(contacts, contactV4.Wrap())
+// 	}
+//
+// 	return contacts, nil
+// }
+
+// 分割线
+func (ds *DataSource) GetSessions(ctx context.Context, key string, limit, offset int) ([]*v4.SessionModel, error) {
 	var query string
 	var args []interface{}
 
 	if key != "" {
 		// 按照关键字查询
-		query = `SELECT username, local_type, alias, remark, nick_name, big_head_url, small_head_url, extra_buffer 
-				FROM contact 
-				WHERE username = ? OR alias = ? OR remark = ? OR nick_name = ?`
-		args = []interface{}{key, key, key, key}
+		query = `SELECT username, summary, last_timestamp, last_msg_sender, last_sender_display_name 
+				FROM SessionTable 
+				WHERE username NOT LIKE 'gh_%' 
+				AND username = ? OR last_sender_display_name = ?
+				ORDER BY sort_timestamp DESC`
+		args = []interface{}{key, key}
 	} else {
-		// 查询所有联系人
-		query = `SELECT username, local_type, alias, remark, nick_name, big_head_url, small_head_url, extra_buffer FROM contact`
+		// 查询所有会话
+		query = `SELECT username, summary, last_timestamp, last_msg_sender, last_sender_display_name 
+				FROM SessionTable 
+    			WHERE username NOT LIKE 'gh_%' 
+				ORDER BY sort_timestamp DESC`
 	}
 
-	// 添加排序、分页
-	query += ` ORDER BY username`
+	// 添加分页
 	if limit > 0 {
 		query += fmt.Sprintf(" LIMIT %d", limit)
 		if offset > 0 {
 			query += fmt.Sprintf(" OFFSET %d", offset)
 		}
 	}
-	dbs := ds.dbMap[Contact].GetDb(time.Now(), time.Now())
+
+	// 执行查询
+	dbs := ds.dbMap[Session].GetDb(time.Now(), time.Now())
 	db := dbs[0]
 
 	rows, err := db.QueryContext(ctx, query, args...)
 	if err != nil {
-		log.Errorf("Failed to query contact db.sql:&s,err:%s", query, err)
 		return nil, errorx.QueryFailed()
 	}
 	defer rows.Close()
 
-	contacts := []*model.Contact{}
+	sessions := []*v4.SessionModel{}
 	for rows.Next() {
-		var contactV4 model.ContactV4
+		var sessionModel v4.SessionModel
 		err := rows.Scan(
-			&contactV4.UserName,
-			&contactV4.LocalType,
-			&contactV4.Alias,
-			&contactV4.Remark,
-			&contactV4.NickName,
-			&contactV4.BigHeadUrl,
-			&contactV4.SmallHeadUrl,
-			&contactV4.ExtraBuffer,
+			&sessionModel.Username,
+			&sessionModel.Summary,
+			&sessionModel.LastTimestamp,
+			&sessionModel.LastMsgSender,
+			&sessionModel.LastSenderDisplayName,
 		)
 
 		if err != nil {
 			return nil, errorx.QueryFailed()
 		}
 
-		contacts = append(contacts, contactV4.Wrap())
+		sessions = append(sessions, &sessionModel)
 	}
 
-	return contacts, nil
+	return sessions, nil
 }
+
 func (ds *DataSource) GetAllChatRooms(ctx context.Context) ([]*v4.ChatRoomModel, error) {
 	var query string
 	query = `SELECT id, username, owner, ext_buffer 
@@ -863,6 +913,146 @@ func (ds *DataSource) GetContactLabel(ctx context.Context) ([]*v4.ContactLabelMo
 //
 // 	return nil, errors.ErrMediaNotFound
 // }
+
+func (ds *DataSource) GetMedia(ctx context.Context, _type string, key string) (*v4.MediaModel, error) {
+	if key == "" {
+		return nil, errorx.KeyEmpty()
+	}
+
+	var table string
+	switch _type {
+	case "image":
+		table = "image_hardlink_info_v3"
+		// 4.1.0 版本开始使用 v4 表
+		if !ds.IsExist(Media, table) {
+			table = "image_hardlink_info_v4"
+		}
+	case "video":
+		table = "video_hardlink_info_v3"
+		if !ds.IsExist(Media, table) {
+			table = "video_hardlink_info_v4"
+		}
+	case "file":
+		table = "file_hardlink_info_v3"
+		if !ds.IsExist(Media, table) {
+			table = "file_hardlink_info_v4"
+		}
+	// case "voice":
+	// 	return ds.GetVoice(ctx, key)
+	default:
+		return nil, errorx.MediaTypeUnsupported(_type)
+	}
+
+	query := fmt.Sprintf(`
+	SELECT 
+		f.md5,
+		f.file_name,
+		f.file_size,
+		f.modify_time,
+		IFNULL(d1.username,""),
+		IFNULL(d2.username,"")
+	FROM 
+		%s f
+	LEFT JOIN 
+		dir2id d1 ON d1.rowid = f.dir1
+	LEFT JOIN 
+		dir2id d2 ON d2.rowid = f.dir2
+	`, table)
+	query += " WHERE f.md5 = ? OR f.file_name LIKE ? || '%'"
+	args := []interface{}{key, key}
+
+	// 执行查询
+	dbs := ds.dbMap[Media].GetDb(time.Now(), time.Now())
+
+	db := dbs[0]
+	rows, err := db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, errorx.QueryFailed()
+	}
+	defer rows.Close()
+
+	var media *v4.MediaModel
+	for rows.Next() {
+		var mediaV4 model.MediaV4
+		err := rows.Scan(
+			&mediaV4.Key,
+			&mediaV4.Name,
+			&mediaV4.Size,
+			&mediaV4.ModifyTime,
+			&mediaV4.Dir1,
+			&mediaV4.Dir2,
+		)
+		if err != nil {
+			return nil, errorx.QueryFailed()
+		}
+		mediaV4.Type = _type
+
+		// 优先返回高清图
+		if _type == "image" && strings.HasSuffix(mediaV4.Name, "_h.dat") {
+			break
+		}
+	}
+
+	if media == nil {
+		return nil, nil
+	}
+
+	return media, nil
+}
+
+func (ds *DataSource) IsExist(_db string, table string) bool {
+	dbs := ds.dbMap[Media].GetDb(time.Now(), time.Now())
+
+	db := dbs[0]
+
+	var tableName string
+	query := "SELECT name FROM sqlite_master WHERE type='table' AND name=?;"
+	if err := db.QueryRow(query, table).Scan(&tableName); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return false
+		}
+		return false
+	}
+	return true
+}
+
+func (ds *DataSource) GetVoice(ctx context.Context, key string) ([]byte, error) {
+	if key == "" {
+		return nil, errorx.KeyEmpty()
+	}
+
+	query := `
+	SELECT voice_data
+	FROM VoiceInfo
+	WHERE svr_id = ? 
+	`
+	args := []interface{}{key}
+
+	dbs := ds.dbMap[Voice].GetDb(time.Now(), time.Now())
+
+	for _, db := range dbs {
+		rows, err := db.QueryContext(ctx, query, args...)
+		if err != nil {
+			return nil, errorx.QueryFailed()
+		}
+		defer rows.Close()
+
+		for rows.Next() {
+			var voiceData []byte
+			err := rows.Scan(
+				&voiceData,
+			)
+			if err != nil {
+				return nil, errorx.QueryFailed()
+			}
+			if len(voiceData) > 0 {
+				return voiceData, nil
+			}
+		}
+	}
+
+	return nil, nil
+}
 
 func (ds *DataSource) GetDbChangeChan(module string) chan struct{} {
 	return ds.dbChangeChan[module]

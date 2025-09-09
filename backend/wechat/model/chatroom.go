@@ -13,6 +13,7 @@ type ChatRoom struct {
 	// Extra From Contact
 	Remark   string `json:"remark"`
 	NickName string `json:"nickName"`
+	HeadUrl  string `json:"headUrl"`
 
 	User2DisplayName map[string]string `json:"-"`
 }

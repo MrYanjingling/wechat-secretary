@@ -19,6 +19,8 @@ const (
 	ErrWechatDbFileNotExist    = 100000015
 	ErrMessageDbFileInitFailed = 100000016
 	ErrQueryFailed             = 100000017
+	ErrMediaTypeUnsupported    = 100000018
+	ErrKeyEmpty                = 100000019
 )
 
 func FileGroupNotFound(name string) error {
@@ -35,4 +37,12 @@ func MessageDBInitFailed() error {
 
 func QueryFailed() error {
 	return New(ErrQueryFailed, KV("msg", "Failed to query data"))
+}
+
+func MediaTypeUnsupported(_type string) error {
+	return New(ErrMediaTypeUnsupported, KVf("msg", "Unsupported media type %s", _type))
+}
+
+func KeyEmpty() error {
+	return New(ErrQueryFailed, KV("msg", "Empty key"))
 }

@@ -200,10 +200,297 @@ func (m MessageDb) GetDb(start, end time.Time) []*sql.DB {
 // }
 
 type SessionDb struct {
+	id       string
+	fg       *filemonitor.FileGroup
+	mutex    sync.RWMutex
+	paths    []string
+	dbs      []*sql.DB
+	dbOpen   bool
+	changeCh chan struct{}
+}
+
+func (s *SessionDb) Close() {
+	_ = s.dbs[0].Close()
+}
+
+func (s *SessionDb) InitDb(path string, group *Group, ch chan struct{}) (*filemonitor.FileGroup, error) {
+	fg, err := filemonitor.NewFileGroup(group.Name, path, group.Pattern, group.BlackList)
+	if err != nil {
+		return nil, err
+	}
+	fg.AddCallback(s.callback)
+	s.changeCh = ch
+	s.id = filepath.Base(path)
+	s.fg = fg
+	list, err := fg.List()
+	if err != nil {
+		log.Errorf("Wechat db file not exist %s:%s", path, group.Pattern)
+	}
+	if len(list) != 0 {
+		s.paths = list
+	}
+	return fg, nil
+}
+
+func (s *SessionDb) GetDb(start, end time.Time) []*sql.DB {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	if s.dbOpen {
+		return s.dbs
+	} else {
+		paths := s.getPaths()
+
+		dbs := make([]*sql.DB, 0)
+		for _, path := range paths {
+			if db, err := s.openDb(path); err != nil {
+				log.Errorf("Failed to open contact db,err:%s", err)
+			} else {
+				dbs = append(dbs, db)
+			}
+		}
+		s.dbs = dbs
+		return s.dbs
+	}
+}
+
+func (s *SessionDb) openDb(path string) (*sql.DB, error) {
+	var err error
+	tempPath := path
+	if runtime.GOOS == "windows" {
+		tempPath, err = filecopy.GetTempCopy(s.id, path)
+		if err != nil {
+			log.Errorf("Failed to get contact db copy temp,err:%s", err)
+			return nil, err
+		}
+	}
+	db, err := sql.Open("sqlite3", tempPath)
+	if err != nil {
+		log.Errorf("Failed to connect contact db,err:%s", err)
+		return nil, err
+	}
+	return db, nil
+}
+
+func (s *SessionDb) getPaths() []string {
+	if len(s.paths) != 0 {
+		return s.paths
+	}
+	list, err := s.fg.List()
+	if err != nil {
+		log.Errorf("Failed to get contact db path,err:%s", err)
+	}
+	return list
+}
+
+func (s *SessionDb) callback(event fsnotify.Event) error {
+	if !event.Op.Has(fsnotify.Create) {
+		return nil
+	}
+	s.mutex.Lock()
+	if s.dbOpen {
+		s.dbOpen = false
+	}
+	_ = s.dbs[0].Close()
+
+	s.changeCh <- struct{}{}
+	s.mutex.Unlock()
+	return nil
 }
 
 type MediaDb struct {
+	id       string
+	fg       *filemonitor.FileGroup
+	mutex    sync.RWMutex
+	paths    []string
+	dbs      []*sql.DB
+	dbOpen   bool
+	changeCh chan struct{}
+}
+
+func (s *MediaDb) Close() {
+	_ = s.dbs[0].Close()
+}
+
+func (s *MediaDb) InitDb(path string, group *Group, ch chan struct{}) (*filemonitor.FileGroup, error) {
+	fg, err := filemonitor.NewFileGroup(group.Name, path, group.Pattern, group.BlackList)
+	if err != nil {
+		return nil, err
+	}
+	fg.AddCallback(s.callback)
+	s.changeCh = ch
+	s.id = filepath.Base(path)
+	s.fg = fg
+	list, err := fg.List()
+	if err != nil {
+		log.Errorf("Wechat db file not exist %s:%s", path, group.Pattern)
+	}
+	if len(list) != 0 {
+		s.paths = list
+	}
+	return fg, nil
+}
+
+func (s *MediaDb) GetDb(start, end time.Time) []*sql.DB {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	if s.dbOpen {
+		return s.dbs
+	} else {
+		paths := s.getPaths()
+
+		dbs := make([]*sql.DB, 0)
+		for _, path := range paths {
+			if db, err := s.openDb(path); err != nil {
+				log.Errorf("Failed to open contact db,err:%s", err)
+			} else {
+				dbs = append(dbs, db)
+			}
+		}
+		s.dbs = dbs
+		return s.dbs
+	}
+}
+
+func (s *MediaDb) openDb(path string) (*sql.DB, error) {
+	var err error
+	tempPath := path
+	if runtime.GOOS == "windows" {
+		tempPath, err = filecopy.GetTempCopy(s.id, path)
+		if err != nil {
+			log.Errorf("Failed to get contact db copy temp,err:%s", err)
+			return nil, err
+		}
+	}
+	db, err := sql.Open("sqlite3", tempPath)
+	if err != nil {
+		log.Errorf("Failed to connect contact db,err:%s", err)
+		return nil, err
+	}
+	return db, nil
+}
+
+func (s *MediaDb) getPaths() []string {
+	if len(s.paths) != 0 {
+		return s.paths
+	}
+	list, err := s.fg.List()
+	if err != nil {
+		log.Errorf("Failed to get contact db path,err:%s", err)
+	}
+	return list
+}
+
+func (s *MediaDb) callback(event fsnotify.Event) error {
+	if !event.Op.Has(fsnotify.Create) {
+		return nil
+	}
+	s.mutex.Lock()
+	if s.dbOpen {
+		s.dbOpen = false
+	}
+	_ = s.dbs[0].Close()
+
+	s.changeCh <- struct{}{}
+	s.mutex.Unlock()
+	return nil
 }
 
 type VoiceDb struct {
+	id       string
+	fg       *filemonitor.FileGroup
+	mutex    sync.RWMutex
+	paths    []string
+	dbs      []*sql.DB
+	dbOpen   bool
+	changeCh chan struct{}
+}
+
+func (s *VoiceDb) Close() {
+	for _, db := range s.dbs {
+		_ = db.Close()
+	}
+}
+
+func (s *VoiceDb) InitDb(path string, group *Group, ch chan struct{}) (*filemonitor.FileGroup, error) {
+	fg, err := filemonitor.NewFileGroup(group.Name, path, group.Pattern, group.BlackList)
+	if err != nil {
+		return nil, err
+	}
+	fg.AddCallback(s.callback)
+	s.changeCh = ch
+	s.id = filepath.Base(path)
+	s.fg = fg
+	list, err := fg.List()
+	if err != nil {
+		log.Errorf("Wechat db file not exist %s:%s", path, group.Pattern)
+	}
+	if len(list) != 0 {
+		s.paths = list
+	}
+	return fg, nil
+}
+
+func (s *VoiceDb) GetDb(start, end time.Time) []*sql.DB {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	if s.dbOpen {
+		return s.dbs
+	} else {
+		paths := s.getPaths()
+
+		dbs := make([]*sql.DB, 0)
+		for _, path := range paths {
+			if db, err := s.openDb(path); err != nil {
+				log.Errorf("Failed to open contact db,err:%s", err)
+			} else {
+				dbs = append(dbs, db)
+			}
+		}
+		s.dbs = dbs
+		return s.dbs
+	}
+}
+
+func (s *VoiceDb) openDb(path string) (*sql.DB, error) {
+	var err error
+	tempPath := path
+	if runtime.GOOS == "windows" {
+		tempPath, err = filecopy.GetTempCopy(s.id, path)
+		if err != nil {
+			log.Errorf("Failed to get contact db copy temp,err:%s", err)
+			return nil, err
+		}
+	}
+	db, err := sql.Open("sqlite3", tempPath)
+	if err != nil {
+		log.Errorf("Failed to connect contact db,err:%s", err)
+		return nil, err
+	}
+	return db, nil
+}
+
+func (s *VoiceDb) getPaths() []string {
+	if len(s.paths) != 0 {
+		return s.paths
+	}
+	list, err := s.fg.List()
+	if err != nil {
+		log.Errorf("Failed to get contact db path,err:%s", err)
+	}
+	return list
+}
+
+func (s *VoiceDb) callback(event fsnotify.Event) error {
+	if !event.Op.Has(fsnotify.Create) {
+		return nil
+	}
+	s.mutex.Lock()
+	if s.dbOpen {
+		s.dbOpen = false
+	}
+	_ = s.dbs[0].Close()
+
+	s.changeCh <- struct{}{}
+	s.mutex.Unlock()
+	return nil
 }
