@@ -65,7 +65,7 @@ func (s *KeyService) Init() {
 
 }
 
-func (s *KeyService) GetKeyByAccount(name string) (*types.WeChatAccount, bool) {
+func (s *KeyService) GetAccountByAccountName(name string) (*types.WeChatAccount, bool) {
 	if r, exist := s.weChatAccountMap[name]; exist {
 		return r, true
 	}

@@ -12,7 +12,11 @@ func main() {
 	keyService := service.NewKeyService(manager)
 
 	keyService.Init()
-	err := keyService.DecryptKey()
+	// err := keyService.DecryptKey()
+	account := keyService.GetAccounts()[0].WeChatAccountKey.Account
 
-	fmt.Println(err)
+	coreService := service.NewCoreService(keyService)
+	coreService.Decrypt(account)
+
+	fmt.Println("err")
 }
