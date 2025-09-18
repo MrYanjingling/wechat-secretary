@@ -12,5 +12,6 @@ type Config struct {
 }
 
 type CoreService struct {
-	config *Config
+	Config     *Config
+	KeyService *KeyService
 }

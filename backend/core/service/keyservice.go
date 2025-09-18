@@ -14,8 +14,8 @@ import (
 )
 
 type KeyService struct {
-	weChatManager       *wechat.WechatManager
-	weChatAccountKeyMap map[string]*types.WeChatAccountKey
+	weChatManager    *wechat.WechatManager
+	weChatAccountMap map[string]*types.WeChatAccount
 	// conf           Config
 	lastEvents     map[string]time.Time
 	pendingActions map[string]bool
@@ -28,11 +28,11 @@ func NewKeyService(weChatManager *wechat.WechatManager) *KeyService {
 	client := &storage.FsClient{}
 	client.Init(storage.StoreGroupWechatAccountKey)
 	return &KeyService{
-		weChatManager:       weChatManager,
-		lastEvents:          make(map[string]time.Time),
-		pendingActions:      make(map[string]bool),
-		weChatAccountKeyMap: make(map[string]*types.WeChatAccountKey),
-		fs:                  client,
+		weChatManager:    weChatManager,
+		lastEvents:       make(map[string]time.Time),
+		pendingActions:   make(map[string]bool),
+		weChatAccountMap: make(map[string]*types.WeChatAccount),
+		fs:               client,
 	}
 }
 
@@ -45,13 +45,27 @@ func (s *KeyService) Init() {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	for _, key := range keys {
-		s.weChatAccountKeyMap[key.Account] = key
+		account, err := s.weChatManager.GetAccount(key.Account)
+		if err != nil {
+			log.Errorf("Failed to get wechat account process")
+		} else {
+			wa := &types.WeChatAccount{
+				WeChatAccountKey: key,
+				Platform:         account.Platform,
+				Version:          account.Version,
+				FullVersion:      account.FullVersion,
+				DataDir:          account.DataDir,
+				ExePath:          account.ExePath,
+				Status:           account.Status,
+			}
+			s.weChatAccountMap[key.Account] = wa
+		}
 	}
 
 }
 
-func (s *KeyService) GetKeyByAccount(name string) (*types.WeChatAccountKey, bool) {
-	if r, exist := s.weChatAccountKeyMap[name]; exist {
+func (s *KeyService) GetKeyByAccount(name string) (*types.WeChatAccount, bool) {
+	if r, exist := s.weChatAccountMap[name]; exist {
 		return r, true
 	}
 	return nil, false
@@ -60,7 +74,17 @@ func (s *KeyService) GetKeyByAccount(name string) (*types.WeChatAccountKey, bool
 func (s *KeyService) GetKeys() []*types.WeChatAccountKey {
 	keys := make([]*types.WeChatAccountKey, 0)
 
-	for _, key := range s.weChatAccountKeyMap {
+	for _, key := range s.weChatAccountMap {
+		keys = append(keys, key.WeChatAccountKey)
+	}
+
+	return keys
+}
+
+func (s *KeyService) GetAccounts() []*types.WeChatAccount {
+	keys := make([]*types.WeChatAccount, 0)
+
+	for _, key := range s.weChatAccountMap {
 		keys = append(keys, key)
 	}
 
@@ -73,17 +97,8 @@ func (s *KeyService) DecryptKey() error {
 		return errorx.WeChatProcessNotExist()
 	}
 
-	if len(accounts) == 1 {
-		// key, imgKey := m.ctx.DataKey, m.ctx.ImgKey
-		// if len(key) == 0 || len(imgKey) == 0 || force {
-		// 	key, imgKey, err = m.ctx.WeChatInstances[0].GetKey(context.Background())
-		// 	if err != nil {
-		// 		return "", err
-		// 	}
-		// 	m.ctx.Refresh()
-		// 	m.ctx.UpdateConfig()
-		// }
-		account, err := s.weChatManager.GetAccount(accounts[0].Name)
+	for i, _ := range accounts {
+		account, err := s.weChatManager.GetAccount(accounts[i].Name)
 		if err != nil {
 			log.Errorf("Failed to get WeChat process account")
 			return errorx.WeChatProcessNotExist()
@@ -93,53 +108,19 @@ func (s *KeyService) DecryptKey() error {
 
 		if err != nil {
 			log.Errorf("Failed to get account key")
+			return err
 		}
 
 		_, err = s.fs.Create(key.Account, key)
 		if err != nil {
 			return nil
 		}
-		// result := fmt.Sprintf("Data Key: [%s]\nImage Key: [%s]", key, imgKey)
-		// if m.ctx.Version == 4 && showXorKey {
-		// 	if b, err := dat2img.ScanAndSetXorKey(m.ctx.DataDir); err == nil {
-		// 		result += fmt.Sprintf("\nXor Key: [0x%X]", b)
-		// 	}
-		// }
-		return nil
 	}
 	return nil
-	// if pid == 0 {
-	// 	str := "Select a process:\n"
-	// 	for _, ins := range m.ctx.WeChatInstances {
-	// 		str += fmt.Sprintf("PID: %d. %s[Version: %s Data Dir: %s ]\n", ins.PID, ins.Name, ins.FullVersion, ins.DataDir)
-	// 	}
-	// 	return str, nil
-	// }
-	// for _, ins := range m.ctx.WeChatInstances {
-	// 	if ins.PID == uint32(pid) {
-	// 		key, imgKey := ins.Key, ins.ImgKey
-	// 		if len(key) == 0 || len(imgKey) == 0 || force {
-	// 			key, imgKey, err = ins.GetKey(context.Background())
-	// 			if err != nil {
-	// 				return "", err
-	// 			}
-	// 			m.ctx.Refresh()
-	// 			m.ctx.UpdateConfig()
-	// 		}
-	// 		result := fmt.Sprintf("Data Key: [%s]\nImage Key: [%s]", key, imgKey)
-	// 		if m.ctx.Version == 4 && showXorKey {
-	// 			if b, err := dat2img.ScanAndSetXorKey(m.ctx.DataDir); err == nil {
-	// 				result += fmt.Sprintf("\nXor Key: [0x%X]", b)
-	// 			}
-	// 		}
-	// 		return result, nil
-	// 	}
-	// }
-
 }
 
 func (s *KeyService) loadWechatAccountKey() ([]*types.WeChatAccountKey, error) {
-	objs, err := s.fs.List(storage.WechatAccountKey)
+	objs, err := s.fs.List("")
 	if err != nil {
 		return nil, err
 	}

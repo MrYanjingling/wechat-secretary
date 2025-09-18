@@ -5,3 +5,13 @@ type WeChatAccountKey struct {
 	DataKey string `json:"dataKey"`
 	ImgKey  string `json:"imgKey"`
 }
+
+type WeChatAccount struct {
+	WeChatAccountKey *WeChatAccountKey
+	Platform         string
+	Version          int
+	FullVersion      string
+	DataDir          string
+	ExePath          string
+	Status           string
+}
