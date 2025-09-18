@@ -10,7 +10,8 @@ import (
 )
 
 var (
-	storePath = getStorePath()
+	storePath             = getStorePath()
+	WechatSecretaryPrefix = "D:\\wechatSecretary\\data"
 )
 
 func getStorePath() string {

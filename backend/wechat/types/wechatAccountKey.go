@@ -4,6 +4,7 @@ type WeChatAccountKey struct {
 	Account string `json:"account"`
 	DataKey string `json:"dataKey"`
 	ImgKey  string `json:"imgKey"`
+	DataDir string `json:"dataDir"`
 }
 
 type WeChatAccount struct {

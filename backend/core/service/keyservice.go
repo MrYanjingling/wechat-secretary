@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"github.com/labstack/gommon/log"
 	"os"
+	"path/filepath"
 	"sync"
 	"time"
 	"wechat-secretary/backend/core/storage"
@@ -110,6 +111,9 @@ func (s *KeyService) DecryptKey() error {
 			log.Errorf("Failed to get account key")
 			return err
 		}
+
+		// 默认设置数据目录
+		key.DataDir = filepath.Join(storage.WechatSecretaryPrefix, key.Account)
 
 		_, err = s.fs.Create(key.Account, key)
 		if err != nil {
