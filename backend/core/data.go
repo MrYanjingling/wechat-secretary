@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"time"
 	"wechat-secretary/backend/core/service"
 	"wechat-secretary/backend/wechat"
 )
@@ -18,5 +19,6 @@ func main() {
 	coreService := service.NewCoreService(keyService)
 	coreService.Decrypt(account)
 
+	<-time.After(30 * time.Minute)
 	fmt.Println("err")
 }

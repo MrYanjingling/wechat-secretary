@@ -20,8 +20,8 @@ type KeyService struct {
 	// conf           Config
 	lastEvents     map[string]time.Time
 	pendingActions map[string]bool
-	mutex          sync.Mutex
 	fm             *filemonitor.FileMonitor
+	mutex          sync.Mutex
 	fs             *storage.FsClient
 }
 
