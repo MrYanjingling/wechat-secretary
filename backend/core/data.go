@@ -14,7 +14,7 @@ func main() {
 
 	keyService.Init()
 	// err := keyService.DecryptKey()
-	account := keyService.GetAccounts()[0].WeChatAccountKey.Account
+	account := keyService.GetWxAccount()[0].Name
 
 	coreService := service.NewCoreService(keyService)
 	coreService.Decrypt(account)

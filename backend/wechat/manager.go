@@ -205,7 +205,7 @@ func (m *WechatManager) GetAccounts() []*Account {
 // 	return account.DecryptDatabase(ctx, dbPath, outputPath)
 // }
 
-func (m *WechatManager) GetAccountKey(name string) (*types.WeChatAccountKey, error) {
+func (m *WechatManager) GetAccountKey(name string) (*types.WeChatAccountDetails, error) {
 
 	// 刷新进程状态
 	if err := m.RefreshStatus(name); err != nil {
@@ -233,10 +233,17 @@ func (m *WechatManager) GetAccountKey(name string) (*types.WeChatAccountKey, err
 		return nil, err
 	}
 
-	return &types.WeChatAccountKey{
-		Account: name,
-		DataKey: dataKey,
-		ImgKey:  imgKey,
+	return &types.WeChatAccountDetails{
+		Account:       name,
+		DataKey:       dataKey,
+		ImgKey:        imgKey,
+		Platform:      process.Platform,
+		Version:       process.Version,
+		FullVersion:   process.FullVersion,
+		DataSourceDir: process.DataDir,
+		ExePath:       process.ExePath,
+		NonLocal:      false,
+		Status:        process.Status,
 	}, nil
 
 }
