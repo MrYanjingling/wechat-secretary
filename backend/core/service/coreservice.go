@@ -45,7 +45,7 @@ func NewCoreService(service *KeyService) *CoreService {
 }
 
 func (s *CoreService) Decrypt(accountName string) error {
-	account, b := s.KeyService.GetAccountByAccountName(accountName)
+	account, b := s.KeyService.GetAccountDetailsByAccountName(accountName)
 	if !b {
 		logs.Errorf("Failed to get wechat account")
 		return nil
@@ -70,7 +70,7 @@ func (s *CoreService) Decrypt(accountName string) error {
 }
 
 type WechatAccountManager struct {
-	weChatAccount  *types.WeChatAccount
+	weChatAccount  *types.WeChatAccountDetails
 	lastEvents     map[string]time.Time
 	pendingActions map[string]bool
 	fm             *filemonitor.FileMonitor
@@ -78,7 +78,7 @@ type WechatAccountManager struct {
 }
 
 func (w *WechatAccountManager) Decrypt() error {
-	dbGroup, err := filemonitor.NewFileGroup("wechat", w.weChatAccount.DataDir, `.*\.db$`, []string{"fts"})
+	dbGroup, err := filemonitor.NewFileGroup("wechat", w.weChatAccount.DataSourceDir, `.*\.db$`, []string{"fts"})
 	if err != nil {
 		return err
 	}
@@ -111,7 +111,7 @@ func (w *WechatAccountManager) DecryptDBFile(dbFile string) error {
 		return err
 	}
 
-	output := filepath.Join(w.weChatAccount.WeChatAccountKey.DataDir, dbFile[len(w.weChatAccount.DataDir):])
+	output := filepath.Join(w.weChatAccount.DataDecryptDir, dbFile[len(w.weChatAccount.DataSourceDir):])
 	if err := util.PrepareDir(filepath.Dir(output)); err != nil {
 		return err
 	}
@@ -128,7 +128,7 @@ func (w *WechatAccountManager) DecryptDBFile(dbFile string) error {
 		}
 	}()
 
-	if err := decryptor.Decrypt(context.Background(), dbFile, w.weChatAccount.WeChatAccountKey.DataKey, outputFile); err != nil {
+	if err := decryptor.Decrypt(context.Background(), dbFile, w.weChatAccount.DataKey, outputFile); err != nil {
 		if err == errorx.ErrAlreadyDecrypted() {
 			if data, err := os.ReadFile(dbFile); err == nil {
 				outputFile.Write(data)
@@ -144,8 +144,8 @@ func (w *WechatAccountManager) DecryptDBFile(dbFile string) error {
 }
 
 func (w *WechatAccountManager) StartAutoDecrypt() error {
-	logs.Infof("Start auto decrypt, data dir: %s", w.weChatAccount.DataDir)
-	dbGroup, err := filemonitor.NewFileGroup("wechat", w.weChatAccount.DataDir, `.*\.db$`, []string{"fts"})
+	logs.Infof("Start auto decrypt, data dir: %s", w.weChatAccount.DataSourceDir)
+	dbGroup, err := filemonitor.NewFileGroup("wechat", w.weChatAccount.DataSourceDir, `.*\.db$`, []string{"fts"})
 	if err != nil {
 		return err
 	}
@@ -154,7 +154,7 @@ func (w *WechatAccountManager) StartAutoDecrypt() error {
 	w.fm = filemonitor.NewFileMonitor()
 	w.fm.AddGroup(dbGroup)
 	if err := w.fm.Start(); err != nil {
-		logs.Errorf("Failed to start file monitor, data dir: %s", w.weChatAccount.DataDir)
+		logs.Errorf("Failed to start file monitor, data dir: %s", w.weChatAccount.DataSourceDir)
 		return err
 	}
 	return nil
