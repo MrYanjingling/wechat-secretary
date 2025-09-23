@@ -44,12 +44,24 @@ func NewCoreService(service *KeyService) *CoreService {
 	}
 }
 
-func (s *CoreService) AddNonLocalAccount(account *types.WeChatAccountDetails) {
-	// 检查 原目录是否存在
+func (s *CoreService) AddNonLocalAccount(account *types.WeChatAccountDetails) error {
+	err := s.checkAccount(account)
+	if err != nil {
+		return err
+	}
+	err = s.storeAccount(account)
+	if err != nil {
+		return err
+	}
+	return nil
+}
 
-	// 检查是否可以解密
+func (s *CoreService) checkAccount(account *types.WeChatAccountDetails) error {
+	return nil
+}
 
-	// 保证key没问题
+func (s *CoreService) storeAccount(account *types.WeChatAccountDetails) error {
+	return s.KeyService.StoreAccount(account)
 }
 
 func (s *CoreService) GetAllAccounts() []*types.WeChatAccountDetails {

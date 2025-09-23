@@ -97,10 +97,15 @@ func (s *KeyService) DecryptKey(name string) error {
 	// 默认设置数据目录
 	ad.DataDecryptDir = filepath.Join(storage.WechatSecretaryPrefix, ad.Account)
 
-	return s.StoreKey(ad)
+	return s.StoreAccount(ad)
 }
 
-func (s *KeyService) StoreKey(account *types.WeChatAccountDetails) error {
+func (s *KeyService) StoreAccount(account *types.WeChatAccountDetails) error {
+	details, exist := s.weChatAccountMap[account.Account]
+	if !exist {
+		s.weChatAccountMap[account.Account] = details
+	}
+
 	_, err := s.fs.Create(account.Account, account)
 	if err != nil {
 		return err
