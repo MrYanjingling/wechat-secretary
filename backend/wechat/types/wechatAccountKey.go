@@ -21,7 +21,7 @@ type WeChatAccountDetails struct {
 	Account        string `json:"account"`
 	DataKey        string `json:"dataKey"`
 	ImgKey         string `json:"imgKey"`
-	DataDecryptDir string `json:"dataDir"`
+	DataDecryptDir string `json:"dataDecryptDir"`
 	Platform       string `json:"platform"`
 	Version        int    `json:"version"`
 	FullVersion    string `json:"fullVersion"`

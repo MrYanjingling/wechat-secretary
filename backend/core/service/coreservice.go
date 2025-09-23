@@ -44,6 +44,18 @@ func NewCoreService(service *KeyService) *CoreService {
 	}
 }
 
+func (s *CoreService) AddNonLocalAccount(account *types.WeChatAccountDetails) {
+	// 检查 原目录是否存在
+
+	// 检查是否可以解密
+
+	// 保证key没问题
+}
+
+func (s *CoreService) GetAllAccounts() []*types.WeChatAccountDetails {
+	return s.KeyService.GetAccountDetails()
+}
+
 func (s *CoreService) Decrypt(accountName string) error {
 	account, b := s.KeyService.GetAccountDetailsByAccountName(accountName)
 	if !b {
