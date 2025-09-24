@@ -46,6 +46,14 @@ func (s *KeyService) Init() {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	for _, key := range keys {
+		if a, err := s.weChatManager.GetAccount(key.Account); err == nil {
+			key.DataSourceDir = a.DataDir
+			key.Platform = a.Platform
+			key.Version = a.Version
+			key.FullVersion = a.FullVersion
+			key.ExePath = a.ExePath
+			key.Status = a.Status
+		}
 		s.weChatAccountMap[key.Account] = key
 	}
 

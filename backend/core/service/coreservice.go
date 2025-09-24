@@ -30,17 +30,19 @@ type Config struct {
 }
 
 type CoreService struct {
-	Config         *Config
-	KeyService     *KeyService
-	mutex          sync.Mutex
-	wechatAccounts map[string]*WechatAccountManager
+	Config          *Config
+	KeyService      *KeyService
+	mutex           sync.Mutex
+	wechatAccounts  map[string]*WechatAccountManager
+	accountsService map[string]*WechatService
 }
 
 func NewCoreService(service *KeyService) *CoreService {
 	return &CoreService{
-		Config:         nil,
-		KeyService:     service,
-		wechatAccounts: map[string]*WechatAccountManager{},
+		Config:          nil,
+		KeyService:      service,
+		wechatAccounts:  map[string]*WechatAccountManager{},
+		accountsService: map[string]*WechatService{},
 	}
 }
 
@@ -86,9 +88,15 @@ func (s *CoreService) Decrypt(accountName string) error {
 		return err
 	}
 
+	service, err := NewWechatService(wam.weChatAccount)
+	if err != nil {
+		return err
+	}
+
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	s.wechatAccounts[accountName] = wam
+	s.accountsService[accountName] = service
 
 	return nil
 }
